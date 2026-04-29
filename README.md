@@ -13,7 +13,7 @@ Rive artboard, and wraps them in React components for easy reuse. Big thanks
 to multiavatar.com for the original artwork — without it this wouldn't exist.
 
 This will be featured in [coffeesudoku.com](https://coffeesudoku.com) mobile game (freenoads)
-
+also if you want to readjust the avatar.riv here is a marketplace file (i think you can just fork it for your purpose, if not let me know) [avatar rive preview](https://rive.app/community/files/27484-51919-animated-avatars-for-multiavatarcom)
 MIT licensed.
 
 ## Preview
