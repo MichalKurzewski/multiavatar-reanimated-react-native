@@ -1,0 +1,56 @@
+{
+  "name": "@michalkurzewski/multiavatar-reanimated-react-native",
+  "version": "0.1.0",
+  "description": "Customizable Rive-animated avatar (16 multiavatar.com shapes) for React Native + web. Editor, presets, mistake/win triggers, persistent state, SVG fallback.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./asset": "./assets/avatar.riv"
+  },
+  "files": [
+    "src",
+    "assets",
+    "gifs",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "react-native",
+    "rive",
+    "avatar",
+    "multiavatar",
+    "expo",
+    "data-binding"
+  ],
+  "author": "Michal Kurzewski",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MichalKurzewski/coffee-sudoku.git",
+    "directory": "packages/multiavatar-reanimated-react-native"
+  },
+  "homepage": "https://github.com/MichalKurzewski/coffee-sudoku/tree/main/packages/multiavatar-reanimated-react-native#readme",
+  "bugs": "https://github.com/MichalKurzewski/coffee-sudoku/issues",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "peerDependencies": {
+    "@react-native-async-storage/async-storage": "*",
+    "@rive-app/react-native": "^0.4.6",
+    "react": ">=18",
+    "react-native": ">=0.74",
+    "react-native-svg": "*",
+    "zustand": "*"
+  },
+  "peerDependenciesMeta": {
+    "@react-native-async-storage/async-storage": { "optional": true }
+  },
+  "scripts": {
+    "gen:parts": "bun run scripts/genAvatarPartsData.ts"
+  }
+}
