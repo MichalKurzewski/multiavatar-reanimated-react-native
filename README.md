@@ -12,6 +12,8 @@ package picks 16 of those shapes, exposes them as a switchable, color-bindable
 Rive artboard, and wraps them in React components for easy reuse. Big thanks
 to multiavatar.com for the original artwork — without it this wouldn't exist.
 
+This will be featured in [coffeesudoku.com](https://coffeesudoku.com) mobile game (freenoads)
+
 MIT licensed.
 
 ## Preview
