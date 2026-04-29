@@ -1,12 +1,19 @@
 {
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-native",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
     "noEmit": true,
-    "composite": false,
-    "baseUrl": ".",
-    "paths": {}
+    "rootDir": "src",
+    "baseUrl": "."
   },
   "include": ["src/**/*", "src/**/*.d.ts"]
 }
