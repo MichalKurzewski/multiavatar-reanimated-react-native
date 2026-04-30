@@ -15,7 +15,7 @@ const SPY_GREY_ACCENT = "3a3a3a";
 const SPY_GREY_DARK = "1a1a1a";
 
 const SPY_ENUMS: Record<string, string> = {
-  topEnum: "Country",
+  StyleTopEnum: "Country",
   clothesEnum: "Firehair",
   eyesEnum: "Female",
   mouthEnum: "Older",

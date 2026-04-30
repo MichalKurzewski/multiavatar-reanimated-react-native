@@ -1,11 +1,25 @@
-import type { AvatarPart, AvatarShape, CustomAvatar, EditablePart } from "./avatarConstants";
+import {
+  type CustomAvatar,
+  type EditablePart,
+  type ShapeForPart,
+  baseShapeFor,
+} from "./avatarConstants";
 import { RAW_PART_SVG, SHARED_ENV_SVG, SHARED_HEAD_SVG } from "./avatarPartsData.generated";
 
 const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 231 231">';
 const SVG_CLOSE = "</svg>";
 
-export function colorSlotCount(shape: AvatarShape, part: EditablePart): number {
-  const matches = RAW_PART_SVG[shape][part].match(/#(.*?);/g);
+/**
+ * Look up the raw SVG for a shape + part, resolving top variants (e.g. `Guy2`)
+ * back to their base {@link AvatarShape} since variants currently share the
+ * base shape's SVG fallback.
+ */
+function rawPartSvg<P extends EditablePart>(shape: ShapeForPart<P>, part: P): string {
+  return RAW_PART_SVG[baseShapeFor(shape, part)][part];
+}
+
+export function colorSlotCount<P extends EditablePart>(shape: ShapeForPart<P>, part: P): number {
+  const matches = rawPartSvg(shape, part).match(/#(.*?);/g);
   return matches ? matches.length : 0;
 }
 
@@ -17,8 +31,11 @@ export function applyColors(rawSvg: string, colors: readonly string[]): string {
   });
 }
 
-export function renderPartSvg(part: AvatarPart, partType: EditablePart): string {
-  return applyColors(RAW_PART_SVG[part.shape][partType], part.colors);
+export function renderPartSvg<P extends EditablePart>(
+  part: { shape: ShapeForPart<P>; colors: readonly string[] },
+  partType: P
+): string {
+  return applyColors(rawPartSvg(part.shape, partType), part.colors);
 }
 
 export function composeAvatarSvg(avatar: CustomAvatar): string {
@@ -31,12 +48,12 @@ export function composeAvatarSvg(avatar: CustomAvatar): string {
   return SVG_OPEN + env + head + clo + top + eyes + mouth + SVG_CLOSE;
 }
 
-export function renderPartThumbnailSvg(
-  shape: AvatarShape,
-  partType: EditablePart,
+export function renderPartThumbnailSvg<P extends EditablePart>(
+  shape: ShapeForPart<P>,
+  partType: P,
   colors: readonly string[]
 ): string {
-  return SVG_OPEN + applyColors(RAW_PART_SVG[shape][partType], colors) + SVG_CLOSE;
+  return SVG_OPEN + applyColors(rawPartSvg(shape, partType), colors) + SVG_CLOSE;
 }
 
 /**
@@ -53,10 +70,10 @@ const PART_VIEWBOX: Record<EditablePart, string> = {
   mouth: "65 130 100 50",
 };
 
-export function renderShapeThumbnailSvg(
+export function renderShapeThumbnailSvg<P extends EditablePart>(
   avatar: CustomAvatar,
-  partType: EditablePart,
-  candidateShape: AvatarShape,
+  partType: P,
+  candidateShape: ShapeForPart<P>,
   candidateColors: readonly string[]
 ): string {
   const next: CustomAvatar = {

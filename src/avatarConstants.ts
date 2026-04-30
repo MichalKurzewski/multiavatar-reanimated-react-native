@@ -21,6 +21,83 @@ export const AVATAR_SHAPES = [
 
 export type AvatarShape = (typeof AVATAR_SHAPES)[number];
 
+/**
+ * Top (hair / hat) shape enum. The Rive artboard's `StyleTopEnum` exposes
+ * numbered variants for some base shapes (e.g. `Guy1`, `Guy2`, `Guy3`) so the
+ * top can change independently of the rest of the face. Clo / eyes / mouth
+ * still use {@link AVATAR_SHAPES} — only top has variants.
+ *
+ * Variants share the base shape's SVG fallback and default colors via
+ * {@link TOP_BASE_SHAPE} until their own SVGs are added to the multiavatar
+ * source and regenerated.
+ */
+export const TOP_SHAPES = [
+  "Robo",
+  "Girl",
+  "Blonde",
+  "Guy1",
+  "Guy2",
+  "Guy3",
+  "Country",
+  "Geeknot",
+  "Asian1",
+  "Asian2",
+  "Punk",
+  "Afrohair1",
+  "Afrohair2",
+  "Female1",
+  "Female2",
+  "Female3",
+  "Older1",
+  "Older2",
+  "Older3",
+  "Firehair",
+  "Blond",
+  "Ateam1",
+  "Ateam2",
+  "Rasta",
+  "Meta1",
+  "Meta2",
+  "Meta3",
+] as const;
+
+export type TopShape = (typeof TOP_SHAPES)[number];
+
+/**
+ * Map a {@link TopShape} variant back to the base {@link AvatarShape} that
+ * owns its SVG source and default-color palette. Plain shapes (no variant
+ * suffix) map to themselves.
+ */
+export const TOP_BASE_SHAPE: Record<TopShape, AvatarShape> = {
+  Robo: "Robo",
+  Girl: "Girl",
+  Blonde: "Blonde",
+  Guy1: "Guy",
+  Guy2: "Guy",
+  Guy3: "Guy",
+  Country: "Country",
+  Geeknot: "Geeknot",
+  Asian1: "Asian",
+  Asian2: "Asian",
+  Punk: "Punk",
+  Afrohair1: "Afrohair",
+  Afrohair2: "Afrohair",
+  Female1: "Female",
+  Female2: "Female",
+  Female3: "Female",
+  Older1: "Older",
+  Older2: "Older",
+  Older3: "Older",
+  Firehair: "Firehair",
+  Blond: "Blond",
+  Ateam1: "Ateam",
+  Ateam2: "Ateam",
+  Rasta: "Rasta",
+  Meta1: "Meta",
+  Meta2: "Meta",
+  Meta3: "Meta",
+};
+
 export type EditablePart = "clo" | "top" | "eyes" | "mouth";
 
 export const EDITABLE_PARTS: readonly EditablePart[] = ["top", "clo", "eyes", "mouth"];
@@ -37,8 +114,13 @@ export type AvatarPart = {
   colors: string[];
 };
 
+export type AvatarTopPart = {
+  shape: TopShape;
+  colors: string[];
+};
+
 export type CustomAvatar = {
-  top: AvatarPart;
+  top: AvatarTopPart;
   clo: AvatarPart;
   eyes: AvatarPart;
   mouth: AvatarPart;
@@ -46,13 +128,31 @@ export type CustomAvatar = {
   skin: string;
 };
 
+/** Shape value type per editable part — top has its own variant-aware union. */
+export type ShapeForPart<P extends EditablePart> = P extends "top" ? TopShape : AvatarShape;
+
+/** List of shape names available for a given part. */
+export function shapesForPart<P extends EditablePart>(part: P): readonly ShapeForPart<P>[] {
+  return (part === "top" ? TOP_SHAPES : AVATAR_SHAPES) as readonly ShapeForPart<P>[];
+}
+
+/**
+ * Resolve a shape value to the base {@link AvatarShape} that owns its SVG
+ * source and default colors. Top variants collapse to their base; non-top
+ * shapes pass through.
+ */
+export function baseShapeFor(shape: AvatarShape | TopShape, part: EditablePart): AvatarShape {
+  if (part === "top") return TOP_BASE_SHAPE[shape as TopShape];
+  return shape as AvatarShape;
+}
+
 export const DEFAULT_BACKGROUND_COLOR = "#ff7520";
 export const DEFAULT_SKIN_COLOR = "#f5d4a6";
 export const SPY34_BACKGROUND_COLOR = "#2a2a2a";
 export const SPY34_SKIN_COLOR = "#5a5a5a";
 
 export const RIVE_ENUM_PATH: Record<EditablePart, string> = {
-  top: "topEnum",
+  top: "StyleTopEnum",
   clo: "clothesEnum",
   eyes: "eyesEnum",
   mouth: "mouthEnum",
@@ -64,9 +164,13 @@ export const RIVE_ENUM_PATH: Record<EditablePart, string> = {
  * in a single color, which would make `classifyColorSlots` collapse it to
  * main-only and leave the accent unbound. Listing a 2nd distinct color here
  * exposes the accent in the editor and feeds the Rive bind.
+ *
+ * For top variants (e.g. `Guy2`), the override is keyed by the variant name —
+ * if no entry matches, lookup falls back to the base shape via
+ * {@link TOP_BASE_SHAPE}.
  */
 const PART_COLOR_OVERRIDES: Partial<
-  Record<AvatarShape, Partial<Record<EditablePart, readonly string[]>>>
+  Record<AvatarShape | TopShape, Partial<Record<EditablePart, readonly string[]>>>
 > = {
   // Robo's top got a separate accent piece in the redesigned Rive file.
   Robo: {
@@ -74,23 +178,36 @@ const PART_COLOR_OVERRIDES: Partial<
   },
 };
 
-export function getDefaultPartColors(shape: AvatarShape, part: EditablePart): readonly string[] {
-  return PART_COLOR_OVERRIDES[shape]?.[part] ?? DEFAULT_PART_COLORS[shape][part];
+export function getDefaultPartColors<P extends EditablePart>(
+  shape: ShapeForPart<P>,
+  part: P
+): readonly string[] {
+  const override = PART_COLOR_OVERRIDES[shape]?.[part];
+  if (override) return override;
+  const base = baseShapeFor(shape, part);
+  return DEFAULT_PART_COLORS[base][part];
 }
 
-function defaultPart(shape: AvatarShape, part: EditablePart): AvatarPart {
-  return { shape, colors: [...getDefaultPartColors(shape, part)] };
+function defaultTopPart(shape: TopShape): AvatarTopPart {
+  return { shape, colors: [...getDefaultPartColors(shape, "top")] };
+}
+
+function defaultBodyPart<P extends Exclude<EditablePart, "top">>(
+  shape: AvatarShape,
+  part: P
+): AvatarPart {
+  return { shape, colors: [...getDefaultPartColors(shape as ShapeForPart<P>, part)] };
 }
 
 export function buildAvatar(
-  shapes: Record<EditablePart, AvatarShape>,
+  shapes: { top: TopShape; clo: AvatarShape; eyes: AvatarShape; mouth: AvatarShape },
   options: { background?: string; skin?: string } = {}
 ): CustomAvatar {
   return {
-    top: defaultPart(shapes.top, "top"),
-    clo: defaultPart(shapes.clo, "clo"),
-    eyes: defaultPart(shapes.eyes, "eyes"),
-    mouth: defaultPart(shapes.mouth, "mouth"),
+    top: defaultTopPart(shapes.top),
+    clo: defaultBodyPart(shapes.clo, "clo"),
+    eyes: defaultBodyPart(shapes.eyes, "eyes"),
+    mouth: defaultBodyPart(shapes.mouth, "mouth"),
     background: options.background ?? DEFAULT_BACKGROUND_COLOR,
     skin: options.skin ?? DEFAULT_SKIN_COLOR,
   };
@@ -239,9 +356,9 @@ export function toRiveHex(color: string | undefined): string | null {
  * return { main, accent: null } — the Rive file ignores the accent bind for
  * those shapes.
  */
-export function getPartRiveBindingColors(
-  shape: AvatarShape,
-  part: EditablePart,
+export function getPartRiveBindingColors<P extends EditablePart>(
+  shape: ShapeForPart<P>,
+  part: P,
   colors: readonly string[]
 ): { main: string | null; accent: string | null } {
   const groups = classifyColorSlots(getDefaultPartColors(shape, part), {

@@ -9,7 +9,7 @@ type Props = {
 };
 
 const TIPS_AVATAR: CustomAvatar = {
-  top: { shape: "Meta", colors: ["#6a6a6a", "#6a6a6a", "#6a6a6a", "#6a6a6a", "#6a6a6a"] },
+  top: { shape: "Meta1", colors: ["#6a6a6a", "#6a6a6a", "#6a6a6a", "#6a6a6a", "#6a6a6a"] },
   clo: { shape: "Meta", colors: ["#3a3a3a", "#5a6878"] },
   eyes: { shape: "Meta", colors: ["#1a1a1a", "#8aa3b0", "#8aa3b0"] },
   mouth: { shape: "Meta", colors: ["#ffffff", "#3a3a3a"] },
