@@ -1,6 +1,6 @@
 {
   "name": "@michalkurzewski/multiavatar-reanimated-react-native",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Customizable Rive-animated avatar (16 multiavatar.com shapes) for React Native + web. Editor, presets, mistake/win triggers, persistent state, SVG fallback.",
   "main": "src/index.ts",
   "types": "src/index.ts",
