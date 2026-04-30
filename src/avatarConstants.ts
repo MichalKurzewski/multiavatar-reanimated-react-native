@@ -292,13 +292,20 @@ export type ColorSlotGroup = {
 };
 
 /**
- * Colors to skip when classifying mouth slots: white = teeth (uncontrollable).
- * Mouth main = lips, accent = facial hair.
+ * Per-part colors to skip when classifying slots — these stay at their
+ * authored value and don't surface as editable pickers.
+ * - mouth: white = teeth
+ * - eyes: white = sunglasses pixel highlights (Female pixel-art shape)
  */
 export const MOUTH_IGNORED_COLORS: readonly string[] = ["ffffff"];
 
+const PART_IGNORED_COLORS: Partial<Record<EditablePart, readonly string[]>> = {
+  mouth: MOUTH_IGNORED_COLORS,
+  eyes: ["ffffff"],
+};
+
 export function ignoredColorsFor(part: EditablePart): readonly string[] {
-  return part === "mouth" ? MOUTH_IGNORED_COLORS : [];
+  return PART_IGNORED_COLORS[part] ?? [];
 }
 
 /**
