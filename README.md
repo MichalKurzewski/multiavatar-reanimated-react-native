@@ -1,9 +1,10 @@
 # multiavatar-reanimated-react-native
 
 A customizable, animated avatar component for React Native + Expo. Backed by a
-single Rive runtime with full data-binding (16 swappable shapes per part, color
-binds for hair / clothes / eyes / mouth / skin, plus `yes` / `no` state-machine
-triggers). Cross-platform — falls back to an SVG composer on the web.
+single Rive runtime with full data-binding (16 swappable shapes for clothes /
+eyes / mouth, 27 top variants for hair / hats, color binds for hair / clothes /
+eyes / mouth / skin, plus `yes` / `no` state-machine triggers). Cross-platform
+— falls back to an SVG composer on the web.
 
 The shape catalog (16 characters × 4 parts) is adapted from
 [multiavatar.com](https://multiavatar.com) by Gie Katon. The original
@@ -25,7 +26,7 @@ Rive triggers ~200ms in.
 | - | --------------- | -------- | ------- |
 | **default** (Robo, default colors) | <img src="gifs/default-idle.gif" width="160" /> | <img src="gifs/default-yes.gif" width="160" /> | <img src="gifs/default-no.gif" width="160" /> |
 | **spy** (Country / Firehair / Female / Older, greys) | <img src="gifs/spy-idle.gif" width="160" /> | <img src="gifs/spy-yes.gif" width="160" /> | <img src="gifs/spy-no.gif" width="160" /> |
-| **tips** (all Meta, metallic eye accent) | <img src="gifs/tips-idle.gif" width="160" /> | <img src="gifs/tips-yes.gif" width="160" /> | <img src="gifs/tips-no.gif" width="160" /> |
+| **tips** (Meta1 top + Meta clo/eyes/mouth, metallic eye accent) | <img src="gifs/tips-idle.gif" width="160" /> | <img src="gifs/tips-yes.gif" width="160" /> | <img src="gifs/tips-no.gif" width="160" /> |
 | **toned-warm** (Older / Blond / Blond / Firehair, muted) | <img src="gifs/toned-warm-idle.gif" width="160" /> | <img src="gifs/toned-warm-yes.gif" width="160" /> | <img src="gifs/toned-warm-no.gif" width="160" /> |
 
 ## Install
@@ -125,8 +126,9 @@ import { AvatarEditor } from "multiavatar-reanimated-react-native";
 
 The editor exposes:
 
-- 4 shape tabs (Top / Clothes / Eyes / Mouth) with 16-shape circular thumbnail
-  grid; each thumbnail zooms in on the active part.
+- 4 shape tabs (Top / Clothes / Eyes / Mouth) with circular thumbnail grid (27
+  variants for Top, 16 for the other parts); each thumbnail zooms in on the
+  active part.
 - Skin and Background color tabs.
 - Per-part Main + (when applicable) Accent color pickers. Single-color shapes
   auto-collapse to Main only.
@@ -174,8 +176,8 @@ Hardcoded character variants you can drop in unchanged:
 
 - `<SpyAvatar size={64} />` — mysterious greyish silhouette using the
   `Country / Firehair / Female / Older` shape combo with grey color binds.
-- `<TipsAvatar size={64} />` — neutral grey "all Meta" character with a
-  metallic silver-blue eye accent.
+- `<TipsAvatar size={64} />` — neutral grey character (Meta1 top + Meta
+  clo/eyes/mouth) with a metallic silver-blue eye accent.
 
 ## API reference
 
@@ -205,7 +207,11 @@ Hardcoded character variants you can drop in unchanged:
 ### Utility / data
 
 - `DEFAULT_AVATAR`, `SPY34_AVATAR` — example `CustomAvatar` values.
-- `AVATAR_SHAPES` — readonly list of the 16 shape names.
+- `AVATAR_SHAPES` — readonly list of the 16 base shape names (clo / eyes / mouth).
+- `TOP_SHAPES` — readonly list of the 27 top variant names (e.g. `Guy1`, `Asian2`, `Meta3`).
+- `TOP_BASE_SHAPE` — record mapping each `TopShape` back to its base `AvatarShape` (for SVG fallback / default colors).
+- `shapesForPart(part)` — returns `TOP_SHAPES` for `top`, `AVATAR_SHAPES` otherwise.
+- `baseShapeFor(shape, part)` — collapse a top variant to its base `AvatarShape` (passes through for non-top parts).
 - `EDITABLE_PARTS` — `["top", "clo", "eyes", "mouth"]`.
 - `BACKGROUND_PALETTE`, `SKIN_PALETTE`, `HAIR_PALETTE`, `COLOR_PALETTE` — picker palettes.
 - `composeAvatarSvg(avatar)` — compose a full multiavatar SVG string.
@@ -221,7 +227,7 @@ Component code wires them via `vmi.enumProperty(name)` / `vmi.colorProperty(name
 
 | Bind name | Type | Values | Notes |
 | --- | --- | --- | --- |
-| `topEnum` | enum | one of `AVATAR_SHAPES` | Hair / hat shape |
+| `StyleTopEnum` | enum | one of `TOP_SHAPES` | Hair / hat shape (27 variants) |
 | `clothesEnum` | enum | one of `AVATAR_SHAPES` | Clothing shape |
 | `eyesEnum` | enum | one of `AVATAR_SHAPES` | Eye style |
 | `mouthEnum` | enum | one of `AVATAR_SHAPES` | Mouth style |
@@ -237,15 +243,24 @@ Component code wires them via `vmi.enumProperty(name)` / `vmi.colorProperty(name
 | `yes` | trigger | — | Celebration animation |
 | `no` | trigger | — | Negative shake / reaction |
 
-The 16 shape names: `Robo`, `Girl`, `Blonde`, `Guy`, `Country`, `Geeknot`,
-`Asian`, `Punk`, `Afrohair`, `Female`, `Older`, `Firehair`, `Blond`, `Ateam`,
-`Rasta`, `Meta`.
+The 16 base shape names (used by `clo` / `eyes` / `mouth`, and as the fallback
+families for top variants): `Robo`, `Girl`, `Blonde`, `Guy`, `Country`,
+`Geeknot`, `Asian`, `Punk`, `Afrohair`, `Female`, `Older`, `Firehair`, `Blond`,
+`Ateam`, `Rasta`, `Meta`.
+
+The 27 top variants (used by `top` only): `Robo`, `Girl`, `Blonde`, `Guy1`,
+`Guy2`, `Guy3`, `Country`, `Geeknot`, `Asian1`, `Asian2`, `Punk`, `Afrohair1`,
+`Afrohair2`, `Female1`, `Female2`, `Female3`, `Older1`, `Older2`, `Older3`,
+`Firehair`, `Blond`, `Ateam1`, `Ateam2`, `Rasta`, `Meta1`, `Meta2`, `Meta3`.
+Variants currently share their base shape's web-SVG fallback and default
+colors (resolved via `TOP_BASE_SHAPE`); the Rive artboard renders each variant
+distinctly.
 
 ### `CustomAvatar` shape
 
 ```ts
 type CustomAvatar = {
-  top:   { shape: AvatarShape; colors: string[] };
+  top:   { shape: TopShape;    colors: string[] }; // 27 variants, see TOP_SHAPES
   clo:   { shape: AvatarShape; colors: string[] };
   eyes:  { shape: AvatarShape; colors: string[] };
   mouth: { shape: AvatarShape; colors: string[] };
