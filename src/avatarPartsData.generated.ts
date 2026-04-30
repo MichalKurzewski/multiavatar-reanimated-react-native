@@ -193,7 +193,7 @@ export const DEFAULT_PART_COLORS: Record<AvatarShape, Record<BodyPart, readonly 
   },
   Female: {
     clo: ["#101010", "#fff", "#fff"],
-    eyes: ["#000", "none", "none"],
+    eyes: ["#1a1a1a", "#1a1a1a", "#fff"],
     mouth: ["#000"],
   },
   Older: {
