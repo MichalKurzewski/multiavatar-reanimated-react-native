@@ -1,21 +1,29 @@
 import {
+  type AvatarShape,
   type CustomAvatar,
   type EditablePart,
   type ShapeForPart,
-  baseShapeFor,
+  type TopShape,
 } from "./avatarConstants";
-import { RAW_PART_SVG, SHARED_ENV_SVG, SHARED_HEAD_SVG } from "./avatarPartsData.generated";
+import {
+  RAW_PART_SVG,
+  RAW_TOP_SVG,
+  SHARED_ENV_SVG,
+  SHARED_HEAD_SVG,
+} from "./avatarPartsData.generated";
 
 const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 231 231">';
 const SVG_CLOSE = "</svg>";
 
 /**
- * Look up the raw SVG for a shape + part, resolving top variants (e.g. `Guy2`)
- * back to their base {@link AvatarShape} since variants currently share the
- * base shape's SVG fallback.
+ * Look up the raw SVG for a shape + part. Top reads from {@link RAW_TOP_SVG}
+ * (keyed by the 27 {@link TopShape} variants); body parts (`clo` / `eyes` /
+ * `mouth`) read from {@link RAW_PART_SVG} keyed by the 16 base
+ * {@link AvatarShape} names.
  */
 function rawPartSvg<P extends EditablePart>(shape: ShapeForPart<P>, part: P): string {
-  return RAW_PART_SVG[baseShapeFor(shape, part)][part];
+  if (part === "top") return RAW_TOP_SVG[shape as TopShape];
+  return RAW_PART_SVG[shape as AvatarShape][part as Exclude<EditablePart, "top">];
 }
 
 export function colorSlotCount<P extends EditablePart>(shape: ShapeForPart<P>, part: P): number {

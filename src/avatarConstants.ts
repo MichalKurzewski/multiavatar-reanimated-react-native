@@ -1,4 +1,4 @@
-import { DEFAULT_PART_COLORS } from "./avatarPartsData.generated";
+import { DEFAULT_PART_COLORS, DEFAULT_TOP_COLORS } from "./avatarPartsData.generated";
 
 export const AVATAR_SHAPES = [
   "Robo",
@@ -156,34 +156,12 @@ export const RIVE_ENUM_PATH: Record<EditablePart, string> = {
   mouth: "mouthEnum",
 };
 
-/**
- * Per-shape overrides for default part colors. Use when the Rive file exposes
- * a bind (e.g. topAccent) that the auto-generated multiavatar defaults paint
- * in a single color, which would make `classifyColorSlots` collapse it to
- * main-only and leave the accent unbound. Listing a 2nd distinct color here
- * exposes the accent in the editor and feeds the Rive bind.
- *
- * For top variants (e.g. `Guy2`), the override is keyed by the variant name —
- * if no entry matches, lookup falls back to the base shape via
- * {@link TOP_BASE_SHAPE}.
- */
-const PART_COLOR_OVERRIDES: Partial<
-  Record<AvatarShape | TopShape, Partial<Record<EditablePart, readonly string[]>>>
-> = {
-  // Robo's top got a separate accent piece in the redesigned Rive file.
-  Robo: {
-    top: ["#ffffff", "#cccccc"],
-  },
-};
-
 export function getDefaultPartColors<P extends EditablePart>(
   shape: ShapeForPart<P>,
   part: P
 ): readonly string[] {
-  const override = PART_COLOR_OVERRIDES[shape]?.[part];
-  if (override) return override;
-  const base = baseShapeFor(shape, part);
-  return DEFAULT_PART_COLORS[base][part];
+  if (part === "top") return DEFAULT_TOP_COLORS[shape as TopShape];
+  return DEFAULT_PART_COLORS[shape as AvatarShape][part as Exclude<EditablePart, "top">];
 }
 
 /** Per-part color override accepted by {@link buildAvatar}. */
