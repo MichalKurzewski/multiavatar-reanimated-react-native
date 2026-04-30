@@ -170,14 +170,50 @@ import { RiveAvatar, DEFAULT_AVATAR } from "multiavatar-reanimated-react-native"
 
 You manage state, persistence, and triggers yourself.
 
-## Presets
+## Building characters with `buildAvatar`
 
-Hardcoded character variants you can drop in unchanged:
+`buildAvatar(shapes, options?)` is the factory for assembling a `CustomAvatar`
+without hand-writing per-slot color arrays. Pass shape names per part, optional
+`background` / `skin`, and per-part `{ main, accent }` color overrides — the
+factory paints every slot tagged as main/accent (per `classifyColorSlots`),
+leaving authored 3rd+ colors in place. Drop the result into `<RiveAvatar>` or
+seed `AvatarProvider` with it.
 
-- `<SpyAvatar size={64} />` — mysterious greyish silhouette using the
-  `Country / Firehair / Female / Older` shape combo with grey color binds.
-- `<TipsAvatar size={64} />` — neutral grey character (Meta1 top + Meta
-  clo/eyes/mouth) with a metallic silver-blue eye accent.
+```tsx
+import { buildAvatar, RiveAvatar } from "multiavatar-reanimated-react-native";
+
+// Mystery / unknown-user silhouette.
+const SPY_AVATAR = buildAvatar(
+  { top: "Country", clo: "Firehair", eyes: "Female", mouth: "Older" },
+  {
+    background: "#2a2a2a",
+    skin: "#5a5a5a",
+    colors: {
+      top: { main: "#5a5a5a", accent: "#3a3a3a" },
+      clo: { main: "#5a5a5a", accent: "#3a3a3a" },
+      eyes: { main: "#1a1a1a" },
+      mouth: { main: "#1a1a1a" },
+    },
+  }
+);
+
+// Help / hint character, all-Meta with a silver-blue eye accent.
+const TIPS_AVATAR = buildAvatar(
+  { top: "Meta1", clo: "Meta", eyes: "Meta", mouth: "Meta" },
+  {
+    background: "#9a9aa6",
+    skin: "#d2ad6d",
+    colors: {
+      top: { main: "#6a6a6a", accent: "#3a3a3a" },
+      clo: { main: "#3a3a3a", accent: "#5a6878" },
+      eyes: { main: "#1a1a1a", accent: "#8aa3b0" },
+      mouth: { main: "#3a3a3a", accent: "#5a5a5a" },
+    },
+  }
+);
+
+<RiveAvatar avatar={SPY_AVATAR} size={64} noAnimation />;
+```
 
 ## API reference
 
@@ -185,12 +221,15 @@ Hardcoded character variants you can drop in unchanged:
 
 | Component | Mode | Use case |
 | --- | --- | --- |
-| `<UserAvatar size />` | store-driven | Render the active user's avatar |
-| `<RiveAvatar avatar size />` | controlled | One-off avatar with explicit value |
-| `<SpyAvatar size />` | preset | Mystery / unknown user |
-| `<TipsAvatar size />` | preset | Help / hint character |
+| `<UserAvatar size noAnimation />` | store-driven | Render the active user's avatar |
+| `<RiveAvatar avatar size noAnimation />` | controlled | One-off avatar with explicit value |
 | `<AvatarEditor onClose theme onDraftChange maxWidth />` | store-driven | Customization UI |
 | `<AvatarProvider storage storageKey initialAvatar children />` | — | Wrap your app |
+
+`noAnimation` (default `false`) pauses the artboard's idle loop while leaving
+the avatar mounted. `yes` / `no` triggers still fire when invoked — handy for
+holding a quiet pose between game actions and only reacting on win / loss.
+Web fallback accepts the prop for API parity but is a static SVG snapshot.
 
 ### Hooks
 
@@ -206,7 +245,7 @@ Hardcoded character variants you can drop in unchanged:
 
 ### Utility / data
 
-- `DEFAULT_AVATAR`, `SPY34_AVATAR` — example `CustomAvatar` values.
+- `DEFAULT_AVATAR` — the out-of-the-box `CustomAvatar` (Robo for every part).
 - `AVATAR_SHAPES` — readonly list of the 16 base shape names (clo / eyes / mouth).
 - `TOP_SHAPES` — readonly list of the 27 top variant names (e.g. `Guy1`, `Asian2`, `Meta3`).
 - `TOP_BASE_SHAPE` — record mapping each `TopShape` back to its base `AvatarShape` (for SVG fallback / default colors).
@@ -227,7 +266,7 @@ Component code wires them via `vmi.enumProperty(name)` / `vmi.colorProperty(name
 
 | Bind name | Type | Values | Notes |
 | --- | --- | --- | --- |
-| `StyleTopEnum` | enum | one of `TOP_SHAPES` | Hair / hat shape (27 variants) |
+| `topEnum` | enum (`StyleTopEnum`) | one of `TOP_SHAPES` | Hair / hat shape (27 variants) |
 | `clothesEnum` | enum | one of `AVATAR_SHAPES` | Clothing shape |
 | `eyesEnum` | enum | one of `AVATAR_SHAPES` | Eye style |
 | `mouthEnum` | enum | one of `AVATAR_SHAPES` | Mouth style |
@@ -242,6 +281,7 @@ Component code wires them via `vmi.enumProperty(name)` / `vmi.colorProperty(name
 | `skin` | color | RGB | Face / hand skin tone |
 | `yes` | trigger | — | Celebration animation |
 | `no` | trigger | — | Negative shake / reaction |
+| `noAnimation` | boolean | — | Freeze the idle loop. yes/no triggers still play when fired. |
 
 The 16 base shape names (used by `clo` / `eyes` / `mouth`, and as the fallback
 families for top variants): `Robo`, `Girl`, `Blonde`, `Guy`, `Country`,

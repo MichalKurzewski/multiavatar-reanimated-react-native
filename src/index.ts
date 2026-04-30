@@ -7,6 +7,7 @@ export type {
   ColorSlotGroup,
   CustomAvatar,
   EditablePart,
+  PartColorOverride,
   ShapeForPart,
   TopShape,
 } from "./avatarConstants";
@@ -30,9 +31,6 @@ export {
   RIVE_ENUM_PATH,
   shapesForPart,
   SKIN_PALETTE,
-  SPY34_AVATAR,
-  SPY34_BACKGROUND_COLOR,
-  SPY34_SKIN_COLOR,
   TOP_BASE_SHAPE,
   TOP_SHAPES,
   toRiveHex,
@@ -50,8 +48,6 @@ export {
 
 // Components — controlled
 export { RiveAvatar } from "./riveAvatar";
-export { SpyAvatar } from "./spyAvatar";
-export { TipsAvatar } from "./tipsAvatar";
 
 // Components — store-driven
 export { UserAvatar } from "./userAvatar";

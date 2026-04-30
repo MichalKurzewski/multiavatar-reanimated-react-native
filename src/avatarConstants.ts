@@ -148,11 +148,9 @@ export function baseShapeFor(shape: AvatarShape | TopShape, part: EditablePart):
 
 export const DEFAULT_BACKGROUND_COLOR = "#ff7520";
 export const DEFAULT_SKIN_COLOR = "#f5d4a6";
-export const SPY34_BACKGROUND_COLOR = "#2a2a2a";
-export const SPY34_SKIN_COLOR = "#5a5a5a";
 
 export const RIVE_ENUM_PATH: Record<EditablePart, string> = {
-  top: "StyleTopEnum",
+  top: "topEnum",
   clo: "clothesEnum",
   eyes: "eyesEnum",
   mouth: "mouthEnum",
@@ -188,26 +186,56 @@ export function getDefaultPartColors<P extends EditablePart>(
   return DEFAULT_PART_COLORS[base][part];
 }
 
-function defaultTopPart(shape: TopShape): AvatarTopPart {
-  return { shape, colors: [...getDefaultPartColors(shape, "top")] };
+/** Per-part color override accepted by {@link buildAvatar}. */
+export type PartColorOverride = { main?: string; accent?: string };
+
+/**
+ * Paint a shape's slot array, replacing main / accent groups with the
+ * override values. Slots whose default color falls outside main/accent
+ * (3rd+ distinct colors, "none", or `MOUTH_IGNORED_COLORS`) keep their
+ * authored value.
+ */
+function buildPartColors<P extends EditablePart>(
+  shape: ShapeForPart<P>,
+  part: P,
+  override?: PartColorOverride
+): string[] {
+  const colors = [...getDefaultPartColors(shape, part)];
+  if (!override) return colors;
+  const groups = classifyColorSlots(colors, { ignored: ignoredColorsFor(part) });
+  for (const g of groups) {
+    const value = g.role === "main" ? override.main : override.accent;
+    if (value === undefined) continue;
+    for (const i of g.indices) colors[i] = value;
+  }
+  return colors;
 }
 
-function defaultBodyPart<P extends Exclude<EditablePart, "top">>(
-  shape: AvatarShape,
-  part: P
-): AvatarPart {
-  return { shape, colors: [...getDefaultPartColors(shape as ShapeForPart<P>, part)] };
-}
-
+/**
+ * Build a {@link CustomAvatar} from shape names plus optional color
+ * overrides. Use this to assemble preset characters (e.g. a grey "spy"
+ * silhouette, a metallic "tips" character) without hand-crafting per-slot
+ * color arrays.
+ */
 export function buildAvatar(
   shapes: { top: TopShape; clo: AvatarShape; eyes: AvatarShape; mouth: AvatarShape },
-  options: { background?: string; skin?: string } = {}
+  options: {
+    background?: string;
+    skin?: string;
+    colors?: {
+      top?: PartColorOverride;
+      clo?: PartColorOverride;
+      eyes?: PartColorOverride;
+      mouth?: PartColorOverride;
+    };
+  } = {}
 ): CustomAvatar {
+  const c = options.colors ?? {};
   return {
-    top: defaultTopPart(shapes.top),
-    clo: defaultBodyPart(shapes.clo, "clo"),
-    eyes: defaultBodyPart(shapes.eyes, "eyes"),
-    mouth: defaultBodyPart(shapes.mouth, "mouth"),
+    top: { shape: shapes.top, colors: buildPartColors(shapes.top, "top", c.top) },
+    clo: { shape: shapes.clo, colors: buildPartColors(shapes.clo, "clo", c.clo) },
+    eyes: { shape: shapes.eyes, colors: buildPartColors(shapes.eyes, "eyes", c.eyes) },
+    mouth: { shape: shapes.mouth, colors: buildPartColors(shapes.mouth, "mouth", c.mouth) },
     background: options.background ?? DEFAULT_BACKGROUND_COLOR,
     skin: options.skin ?? DEFAULT_SKIN_COLOR,
   };
@@ -219,38 +247,6 @@ export const DEFAULT_AVATAR: CustomAvatar = buildAvatar({
   eyes: "Robo",
   mouth: "Robo",
 });
-
-// Hardcoded greyish silhouette. Uses Robo shapes for every part (known-good in
-// the Rive enum) and grey colors for every bind so all of topMain/topAccent/
-// clothesMain/clothesAccent/eyesMain/eyesAccent/mouthMain/mouthAccent + skin
-// resolve to a flat dark-grey look — no derivation surprises.
-const SPY34_GREY_MAIN = "#5a5a5a";
-const SPY34_GREY_ACCENT = "#3a3a3a";
-const SPY34_GREY_DARK = "#1a1a1a";
-
-// Country top has 4 slots, Firehair clo has 5, Female eyes has 3, Older mouth
-// has 2. Slot counts must match RAW_PART_SVG placeholders so composeAvatarSvg
-// can fill them — see colorSlotCount.
-export const SPY34_AVATAR: CustomAvatar = {
-  top: {
-    shape: "Country",
-    colors: [SPY34_GREY_MAIN, SPY34_GREY_ACCENT, SPY34_GREY_DARK, SPY34_GREY_ACCENT],
-  },
-  clo: {
-    shape: "Firehair",
-    colors: [
-      SPY34_GREY_MAIN,
-      SPY34_GREY_ACCENT,
-      SPY34_GREY_DARK,
-      SPY34_GREY_ACCENT,
-      SPY34_GREY_ACCENT,
-    ],
-  },
-  eyes: { shape: "Female", colors: [SPY34_GREY_DARK, "none", "none"] },
-  mouth: { shape: "Older", colors: [SPY34_GREY_DARK, "#ffffff"] },
-  background: SPY34_BACKGROUND_COLOR,
-  skin: SPY34_SKIN_COLOR,
-};
 
 export const COLOR_PALETTE: readonly string[] = [
   "#000000",

@@ -15,9 +15,18 @@ import { useFadeInOpacity } from "./useFadeInOpacity";
 type Props = {
   avatar: CustomAvatar;
   size?: number;
+  /**
+   * Pause the avatar's idle animation while keeping the artboard mounted.
+   * `yes` / `no` triggers still fire when invoked. Defaults to `false`.
+   */
+  noAnimation?: boolean;
 };
 
-export const RiveAvatar = ({ avatar, size = 200 }: Props): React.ReactElement | null => {
+export const RiveAvatar = ({
+  avatar,
+  size = 200,
+  noAnimation = false,
+}: Props): React.ReactElement | null => {
   const { riveFile, isLoading, error } = useSharedAvatarRiveFile();
   const { riveViewRef, setHybridRef } = useRive();
   const [bindingsApplied, setBindingsApplied] = React.useState(false);
@@ -27,6 +36,23 @@ export const RiveAvatar = ({ avatar, size = 200 }: Props): React.ReactElement | 
 
   useAvatarMistakeTrigger(canRender, riveViewRef);
   useAvatarWinTrigger(canRender, riveViewRef);
+
+  React.useEffect(() => {
+    if (!canRender) return;
+    let cancelled = false;
+    void (async () => {
+      const ref = riveViewRef;
+      if (!ref) return;
+      const ready = await ref.awaitViewReady();
+      if (cancelled || !ready) return;
+      const vmi = ref.getViewModelInstance();
+      vmi?.booleanProperty("noAnimation")?.set(noAnimation);
+      if (!noAnimation) ref.playIfNeeded();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [noAnimation, canRender, riveViewRef]);
 
   React.useEffect(() => {
     if (!canRender) return;

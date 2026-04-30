@@ -7,6 +7,8 @@ import { composeAvatarSvg } from "./avatarSvgComposer";
 type Props = {
   avatar: CustomAvatar;
   size?: number;
+  /** Accepted for API parity — web fallback is a static SVG snapshot. */
+  noAnimation?: boolean;
 };
 
 export const RiveAvatar = ({ avatar, size = 200 }: Props): React.ReactElement => {
