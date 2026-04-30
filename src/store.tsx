@@ -11,6 +11,9 @@ import {
   EDITABLE_PARTS,
   type EditablePart,
   getDefaultPartColors,
+  type ShapeForPart,
+  TOP_SHAPES,
+  type TopShape,
 } from "./avatarConstants";
 import { colorSlotCount } from "./avatarSvgComposer";
 
@@ -29,15 +32,22 @@ const DEFAULT_KEY = "multiavatar.user_avatar.v1";
 const isAvatarShape = (v: unknown): v is AvatarShape =>
   typeof v === "string" && (AVATAR_SHAPES as readonly string[]).includes(v);
 
+const isTopShape = (v: unknown): v is TopShape =>
+  typeof v === "string" && (TOP_SHAPES as readonly string[]).includes(v);
+
+function isShapeForPart<P extends EditablePart>(part: P, v: unknown): v is ShapeForPart<P> {
+  return part === "top" ? isTopShape(v) : isAvatarShape(v);
+}
+
 export function sanitizeAvatar(input: unknown): CustomAvatar | null {
   if (!input || typeof input !== "object") return null;
   const obj = input as Record<string, unknown>;
-  const out: Partial<CustomAvatar> = {};
+  const out: Record<string, unknown> = {};
   for (const part of EDITABLE_PARTS) {
     const entry = obj[part];
     if (!entry || typeof entry !== "object") return null;
     const { shape, colors } = entry as { shape: unknown; colors: unknown };
-    if (!isAvatarShape(shape)) return null;
+    if (!isShapeForPart(part, shape)) return null;
     if (!Array.isArray(colors) || !colors.every((c) => typeof c === "string")) return null;
     const expected = colorSlotCount(shape, part);
     const fixed = (colors as string[]).slice(0, expected);
@@ -60,7 +70,11 @@ type State = {
   noGeneration: number;
   yesGeneration: number;
   setAvatar: (avatar: CustomAvatar) => void;
-  setAvatarPart: (part: EditablePart, shape: AvatarShape, colors: string[]) => void;
+  setAvatarPart: <P extends EditablePart>(
+    part: P,
+    shape: ShapeForPart<P>,
+    colors: string[]
+  ) => void;
   triggerNo: () => void;
   triggerYes: () => void;
 };

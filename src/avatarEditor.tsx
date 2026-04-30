@@ -3,9 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 
 import {
-  AVATAR_SHAPES,
   type AvatarPart,
-  type AvatarShape,
+  type AvatarTopPart,
   BACKGROUND_PALETTE,
   classifyColorSlots,
   COLOR_PALETTE,
@@ -16,6 +15,8 @@ import {
   HAIR_PALETTE,
   ignoredColorsFor,
   PART_LABELS,
+  type ShapeForPart,
+  shapesForPart,
   SKIN_PALETTE,
 } from "./avatarConstants";
 import { renderShapeThumbnailSvg } from "./avatarSvgComposer";
@@ -102,9 +103,12 @@ export const AvatarEditor = ({
     onDraftChange?.(draft);
   }, [draft, onDraftChange]);
 
-  const updatePart = React.useCallback((part: EditablePart, next: AvatarPart) => {
-    setDraft((prev) => ({ ...prev, [part]: next }));
-  }, []);
+  const updatePart = React.useCallback(
+    <P extends EditablePart>(part: P, next: AvatarPart | AvatarTopPart) => {
+      setDraft((prev) => ({ ...prev, [part]: next }));
+    },
+    []
+  );
   const updateBackground = React.useCallback((color: string) => {
     setDraft((prev) => ({ ...prev, background: color }));
   }, []);
@@ -179,13 +183,23 @@ export const AvatarEditor = ({
 
       <View style={{ flexShrink: 1, minHeight: 0 }}>
         {isShapeTab(activeTab) ? (
-          <PartTab
-            part={activeTab}
-            value={draft[activeTab]}
-            avatar={draft}
-            theme={t}
-            onChange={updatePart}
-          />
+          activeTab === "top" ? (
+            <PartTab
+              part="top"
+              value={draft.top}
+              avatar={draft}
+              theme={t}
+              onChange={updatePart}
+            />
+          ) : (
+            <PartTab
+              part={activeTab}
+              value={draft[activeTab]}
+              avatar={draft}
+              theme={t}
+              onChange={updatePart}
+            />
+          )
         ) : activeTab === "skin" ? (
           <ColorOnlyTab
             label="Skin"
@@ -262,9 +276,9 @@ export const AvatarEditor = ({
   );
 };
 
-function colorRoleEntries(
-  part: AvatarPart,
-  partType: EditablePart
+function colorRoleEntries<P extends EditablePart>(
+  part: { shape: ShapeForPart<P>; colors: readonly string[] },
+  partType: P
 ): {
   key: string;
   role: ColorRole;
@@ -286,16 +300,22 @@ function colorRoleEntries(
   }));
 }
 
-type PartTabProps = {
-  part: EditablePart;
-  value: AvatarPart;
+type PartTabProps<P extends EditablePart> = {
+  part: P;
+  value: { shape: ShapeForPart<P>; colors: string[] };
   avatar: CustomAvatar;
   theme: Required<AvatarEditorTheme>;
-  onChange: (part: EditablePart, next: AvatarPart) => void;
+  onChange: (part: P, next: { shape: ShapeForPart<P>; colors: string[] }) => void;
 };
 
-const PartTab = ({ part, value, avatar, theme, onChange }: PartTabProps): React.ReactElement => {
-  const pickShape = (shape: AvatarShape) => {
+const PartTab = <P extends EditablePart>({
+  part,
+  value,
+  avatar,
+  theme,
+  onChange,
+}: PartTabProps<P>): React.ReactElement => {
+  const pickShape = (shape: ShapeForPart<P>) => {
     onChange(part, { shape, colors: [...getDefaultPartColors(shape, part)] });
   };
   const setColorForIndices = (indices: readonly number[], color: string) => {
@@ -313,7 +333,7 @@ const PartTab = ({ part, value, avatar, theme, onChange }: PartTabProps): React.
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6 }}
       >
-        {AVATAR_SHAPES.map((shape) => {
+        {shapesForPart(part).map((shape) => {
           const isActive = shape === value.shape;
           const xml = renderShapeThumbnailSvg(
             avatar,

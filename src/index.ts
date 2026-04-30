@@ -2,14 +2,18 @@
 export type {
   AvatarPart,
   AvatarShape,
+  AvatarTopPart,
   ColorRole,
   ColorSlotGroup,
   CustomAvatar,
   EditablePart,
+  ShapeForPart,
+  TopShape,
 } from "./avatarConstants";
 export {
   AVATAR_SHAPES,
   BACKGROUND_PALETTE,
+  baseShapeFor,
   buildAvatar,
   classifyColorSlots,
   COLOR_PALETTE,
@@ -24,10 +28,13 @@ export {
   MOUTH_IGNORED_COLORS,
   PART_LABELS,
   RIVE_ENUM_PATH,
+  shapesForPart,
   SKIN_PALETTE,
   SPY34_AVATAR,
   SPY34_BACKGROUND_COLOR,
   SPY34_SKIN_COLOR,
+  TOP_BASE_SHAPE,
+  TOP_SHAPES,
   toRiveHex,
 } from "./avatarConstants";
 

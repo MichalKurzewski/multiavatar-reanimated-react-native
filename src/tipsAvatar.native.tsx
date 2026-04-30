@@ -12,7 +12,7 @@ type Props = {
 const TIPS_BACKGROUND = "#9a9aa6";
 
 const TIPS_ENUMS: Record<string, string> = {
-  topEnum: "Meta",
+  StyleTopEnum: "Meta1",
   clothesEnum: "Meta",
   eyesEnum: "Meta",
   mouthEnum: "Meta",

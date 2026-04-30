@@ -4,3 +4,13 @@ dist/
 .DS_Store
 .env
 .env.*
+
+# mempalace
+mempalace.yaml
+entities.json
+
+# Claude Code
+CLAUDE.md
+.claude/
+
+Makefile
