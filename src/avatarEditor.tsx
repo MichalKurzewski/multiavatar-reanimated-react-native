@@ -48,12 +48,15 @@ export type AvatarEditorLocked = {
   mouth?: ReadonlyArray<AvatarShape>;
   /** Hex strings matching {@link BACKGROUND_PALETTE}. */
   backgrounds?: ReadonlyArray<string>;
+  /** Hex strings locked in the top "main" palette ({@link HAIR_PALETTE}). */
+  topColors?: ReadonlyArray<string>;
 };
 
 export type AvatarEditorLockedTapInfo =
   | { part: "top"; value: TopShape }
   | { part: "clo" | "eyes" | "mouth"; value: AvatarShape }
-  | { part: "background"; value: string };
+  | { part: "background"; value: string }
+  | { part: "topColor"; value: string };
 
 export type AvatarEditorProps = {
   /** Called when the user clicks Close/Cancel/Save and the editor wants to dismiss. */
@@ -85,6 +88,7 @@ const EMPTY_LOCKED: Required<AvatarEditorLocked> = {
   eyes: [],
   mouth: [],
   backgrounds: [],
+  topColors: [],
 };
 
 const padlockSvg = (color: string): string =>
@@ -232,6 +236,7 @@ export const AvatarEditor = ({
               theme={t}
               onChange={updatePart}
               lockedShapes={lockedSets.top}
+              lockedTopColors={lockedSets.topColors}
               onLockedTap={onLockedTap}
             />
           ) : (
@@ -358,6 +363,8 @@ type PartTabProps<P extends EditablePart> = {
   theme: Required<AvatarEditorTheme>;
   onChange: (part: P, next: { shape: ShapeForPart<P>; colors: string[] }) => void;
   lockedShapes?: ReadonlyArray<ShapeForPart<P>>;
+  /** Locked colors for the top "main" palette. Only meaningful when part==="top". */
+  lockedTopColors?: ReadonlyArray<string>;
   onLockedTap?: (info: AvatarEditorLockedTapInfo) => void;
 };
 
@@ -368,6 +375,7 @@ const PartTab = <P extends EditablePart>({
   theme,
   onChange,
   lockedShapes,
+  lockedTopColors,
   onLockedTap,
 }: PartTabProps<P>): React.ReactElement => {
   const pickShape = (shape: ShapeForPart<P>) => {
@@ -457,16 +465,26 @@ const PartTab = <P extends EditablePart>({
       </View>
 
       <View style={{ marginTop: 12, gap: 12 }}>
-        {colorRoleEntries(value, part).map(({ key, color, indices, label, palette }) => (
-          <ColorSlotRow
-            key={key}
-            label={label}
-            value={color}
-            palette={palette}
-            theme={theme}
-            onChange={(c) => setColorForIndices(indices, c)}
-          />
-        ))}
+        {colorRoleEntries(value, part).map(({ key, color, indices, label, palette, role }) => {
+          const isTopMainRow = part === "top" && role === "main";
+          const lockedForRow = isTopMainRow ? lockedTopColors : undefined;
+          const lockedTapForRow =
+            isTopMainRow && onLockedTap
+              ? (c: string) => onLockedTap({ part: "topColor", value: c })
+              : undefined;
+          return (
+            <ColorSlotRow
+              key={key}
+              label={label}
+              value={color}
+              palette={palette}
+              theme={theme}
+              onChange={(c) => setColorForIndices(indices, c)}
+              lockedColors={lockedForRow}
+              onLockedTap={lockedTapForRow}
+            />
+          );
+        })}
       </View>
     </ScrollView>
   );
