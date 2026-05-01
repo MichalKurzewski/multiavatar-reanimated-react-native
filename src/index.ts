@@ -52,7 +52,12 @@ export { RiveAvatar } from "./riveAvatar";
 // Components — store-driven
 export { UserAvatar } from "./userAvatar";
 export { AvatarEditor } from "./avatarEditor";
-export type { AvatarEditorProps, AvatarEditorTheme } from "./avatarEditor";
+export type {
+  AvatarEditorLocked,
+  AvatarEditorLockedTapInfo,
+  AvatarEditorProps,
+  AvatarEditorTheme,
+} from "./avatarEditor";
 
 // State (provider + hooks)
 export {

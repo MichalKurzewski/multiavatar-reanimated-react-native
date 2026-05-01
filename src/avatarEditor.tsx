@@ -4,6 +4,7 @@ import { SvgXml } from "react-native-svg";
 
 import {
   type AvatarPart,
+  type AvatarShape,
   type AvatarTopPart,
   BACKGROUND_PALETTE,
   classifyColorSlots,
@@ -18,6 +19,7 @@ import {
   type ShapeForPart,
   shapesForPart,
   SKIN_PALETTE,
+  type TopShape,
 } from "./avatarConstants";
 import { renderShapeThumbnailSvg } from "./avatarSvgComposer";
 import { RiveAvatar } from "./riveAvatar";
@@ -32,6 +34,27 @@ export type AvatarEditorTheme = {
   buttonText?: string;
 };
 
+/**
+ * Lock state for shapes / backgrounds. All keys optional. Entries listed here
+ * render grayscale + padlock and sort to the end of their grid; tapping them
+ * fires {@link AvatarEditorProps.onLockedTap} instead of selecting. The
+ * currently-selected shape/color is never locked-rendered (grandfathered),
+ * so changing the lock list never breaks an in-use avatar.
+ */
+export type AvatarEditorLocked = {
+  top?: ReadonlyArray<TopShape>;
+  clo?: ReadonlyArray<AvatarShape>;
+  eyes?: ReadonlyArray<AvatarShape>;
+  mouth?: ReadonlyArray<AvatarShape>;
+  /** Hex strings matching {@link BACKGROUND_PALETTE}. */
+  backgrounds?: ReadonlyArray<string>;
+};
+
+export type AvatarEditorLockedTapInfo =
+  | { part: "top"; value: TopShape }
+  | { part: "clo" | "eyes" | "mouth"; value: AvatarShape }
+  | { part: "background"; value: string };
+
 export type AvatarEditorProps = {
   /** Called when the user clicks Close/Cancel/Save and the editor wants to dismiss. */
   onClose?: () => void;
@@ -41,6 +64,10 @@ export type AvatarEditorProps = {
   onDraftChange?: (draft: CustomAvatar) => void;
   /** Override the maximum width. Defaults to 340. */
   maxWidth?: number;
+  /** Optional: which shapes/backgrounds are locked. All enabled by default. */
+  locked?: AvatarEditorLocked;
+  /** Optional: fired when the user taps a locked entry (instead of selecting it). */
+  onLockedTap?: (info: AvatarEditorLockedTapInfo) => void;
 };
 
 const DEFAULT_THEME: Required<AvatarEditorTheme> = {
@@ -51,6 +78,17 @@ const DEFAULT_THEME: Required<AvatarEditorTheme> = {
   buttonBackground: "#1a1a1a",
   buttonText: "#ffffff",
 };
+
+const EMPTY_LOCKED: Required<AvatarEditorLocked> = {
+  top: [],
+  clo: [],
+  eyes: [],
+  mouth: [],
+  backgrounds: [],
+};
+
+const padlockSvg = (color: string): string =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="9" x="5" y="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
 
 type ShapeTabId = EditablePart;
 type ColorTabId = "skin" | "background";
@@ -91,8 +129,11 @@ export const AvatarEditor = ({
   theme,
   onDraftChange,
   maxWidth = 340,
+  locked,
+  onLockedTap,
 }: AvatarEditorProps): React.ReactElement => {
   const t = { ...DEFAULT_THEME, ...theme };
+  const lockedSets = { ...EMPTY_LOCKED, ...(locked ?? {}) };
   const { avatar: stored, setAvatar } = useAvatar();
   const [draft, setDraft] = React.useState<CustomAvatar>(stored);
   const [activeTab, setActiveTab] = React.useState<TabId>("top");
@@ -190,6 +231,8 @@ export const AvatarEditor = ({
               avatar={draft}
               theme={t}
               onChange={updatePart}
+              lockedShapes={lockedSets.top}
+              onLockedTap={onLockedTap}
             />
           ) : (
             <PartTab
@@ -198,6 +241,8 @@ export const AvatarEditor = ({
               avatar={draft}
               theme={t}
               onChange={updatePart}
+              lockedShapes={lockedSets[activeTab]}
+              onLockedTap={onLockedTap}
             />
           )
         ) : activeTab === "skin" ? (
@@ -215,6 +260,12 @@ export const AvatarEditor = ({
             palette={BACKGROUND_PALETTE}
             theme={t}
             onChange={updateBackground}
+            lockedColors={lockedSets.backgrounds}
+            onLockedTap={
+              onLockedTap
+                ? (color) => onLockedTap({ part: "background", value: color })
+                : undefined
+            }
           />
         )}
       </View>
@@ -306,6 +357,8 @@ type PartTabProps<P extends EditablePart> = {
   avatar: CustomAvatar;
   theme: Required<AvatarEditorTheme>;
   onChange: (part: P, next: { shape: ShapeForPart<P>; colors: string[] }) => void;
+  lockedShapes?: ReadonlyArray<ShapeForPart<P>>;
+  onLockedTap?: (info: AvatarEditorLockedTapInfo) => void;
 };
 
 const PartTab = <P extends EditablePart>({
@@ -314,6 +367,8 @@ const PartTab = <P extends EditablePart>({
   avatar,
   theme,
   onChange,
+  lockedShapes,
+  onLockedTap,
 }: PartTabProps<P>): React.ReactElement => {
   const pickShape = (shape: ShapeForPart<P>) => {
     onChange(part, { shape, colors: [...getDefaultPartColors(shape, part)] });
@@ -322,6 +377,39 @@ const PartTab = <P extends EditablePart>({
     const next = value.colors.slice();
     for (const i of indices) next[i] = color;
     onChange(part, { ...value, colors: next });
+  };
+
+  const orderedShapes = React.useMemo(() => {
+    const all = shapesForPart(part);
+    const lockedSet = new Set<string>(lockedShapes ?? []);
+    if (lockedSet.size === 0) return all;
+    const isShapeLocked = (s: ShapeForPart<P>): boolean =>
+      lockedSet.has(s as unknown as string) && s !== value.shape;
+    const unlocked: ShapeForPart<P>[] = [];
+    const locked: ShapeForPart<P>[] = [];
+    for (const s of all) {
+      if (isShapeLocked(s)) locked.push(s);
+      else unlocked.push(s);
+    }
+    return [...unlocked, ...locked];
+  }, [part, lockedShapes, value.shape]);
+
+  const lockedSet = React.useMemo(() => new Set<string>(lockedShapes ?? []), [lockedShapes]);
+
+  const handleShapePress = (shape: ShapeForPart<P>) => {
+    const isLocked = lockedSet.has(shape as unknown as string) && shape !== value.shape;
+    if (isLocked) {
+      if (part === "top") {
+        onLockedTap?.({ part: "top", value: shape as TopShape });
+      } else {
+        onLockedTap?.({
+          part: part as "clo" | "eyes" | "mouth",
+          value: shape as AvatarShape,
+        });
+      }
+      return;
+    }
+    pickShape(shape);
   };
 
   return (
@@ -333,8 +421,9 @@ const PartTab = <P extends EditablePart>({
       <View
         style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6 }}
       >
-        {shapesForPart(part).map((shape) => {
+        {orderedShapes.map((shape) => {
           const isActive = shape === value.shape;
+          const isLocked = lockedSet.has(shape as unknown as string) && !isActive;
           const xml = renderShapeThumbnailSvg(
             avatar,
             part,
@@ -344,10 +433,10 @@ const PartTab = <P extends EditablePart>({
           return (
             <Pressable
               key={shape}
-              onPress={() => pickShape(shape)}
+              onPress={() => handleShapePress(shape)}
               accessibilityRole="button"
-              accessibilityLabel={shape}
-              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={isLocked ? `${shape} (locked)` : shape}
+              accessibilityState={{ selected: isActive, disabled: isLocked }}
               style={{
                 width: 48,
                 height: 48,
@@ -358,7 +447,10 @@ const PartTab = <P extends EditablePart>({
                 backgroundColor: avatar.background,
               }}
             >
-              <SvgXml xml={xml} width="100%" height="100%" />
+              <View style={{ width: "100%", height: "100%", opacity: isLocked ? 0.35 : 1 }}>
+                <SvgXml xml={xml} width="100%" height="100%" />
+              </View>
+              {isLocked ? <LockOverlay color={theme.text} /> : null}
             </Pressable>
           );
         })}
@@ -386,6 +478,8 @@ type ColorOnlyTabProps = {
   palette: readonly string[];
   theme: Required<AvatarEditorTheme>;
   onChange: (color: string) => void;
+  lockedColors?: ReadonlyArray<string>;
+  onLockedTap?: (color: string) => void;
 };
 
 const ColorOnlyTab = ({
@@ -394,6 +488,8 @@ const ColorOnlyTab = ({
   palette,
   theme,
   onChange,
+  lockedColors,
+  onLockedTap,
 }: ColorOnlyTabProps): React.ReactElement => (
   <ScrollView
     style={{ flexShrink: 1 }}
@@ -407,6 +503,8 @@ const ColorOnlyTab = ({
         palette={palette}
         theme={theme}
         onChange={onChange}
+        lockedColors={lockedColors}
+        onLockedTap={onLockedTap}
       />
     </View>
   </ScrollView>
@@ -418,6 +516,8 @@ type ColorSlotRowProps = {
   palette: readonly string[];
   theme: Required<AvatarEditorTheme>;
   onChange: (color: string) => void;
+  lockedColors?: ReadonlyArray<string>;
+  onLockedTap?: (color: string) => void;
 };
 
 const ColorSlotRow = ({
@@ -426,34 +526,95 @@ const ColorSlotRow = ({
   palette,
   theme,
   onChange,
-}: ColorSlotRowProps): React.ReactElement => (
-  <View style={{ gap: 4 }}>
-    <Text style={{ fontSize: 12, color: theme.text }}>{label}</Text>
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-      {palette.map((c) => {
-        const isActive = c === value;
-        return (
-          <Pressable
-            key={c}
-            onPress={() => onChange(c)}
-            accessibilityRole="button"
-            accessibilityLabel={c === "none" ? "transparent" : c}
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: 12,
-              backgroundColor: c === "none" ? "transparent" : c,
-              borderWidth: isActive ? 2 : 1,
-              borderColor: isActive ? theme.accent : theme.border,
-            }}
-          >
-            {c === "none" ? <View style={styles.noneSlash} /> : null}
-          </Pressable>
-        );
-      })}
+  lockedColors,
+  onLockedTap,
+}: ColorSlotRowProps): React.ReactElement => {
+  const lockedSet = React.useMemo(() => new Set(lockedColors ?? []), [lockedColors]);
+  const orderedPalette = React.useMemo(() => {
+    if (lockedSet.size === 0) return palette;
+    const unlocked: string[] = [];
+    const locked: string[] = [];
+    for (const c of palette) {
+      if (lockedSet.has(c) && c !== value) locked.push(c);
+      else unlocked.push(c);
+    }
+    return [...unlocked, ...locked];
+  }, [palette, lockedSet, value]);
+
+  return (
+    <View style={{ gap: 4 }}>
+      <Text style={{ fontSize: 12, color: theme.text }}>{label}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+        {orderedPalette.map((c) => {
+          const isActive = c === value;
+          const isLocked = lockedSet.has(c) && !isActive;
+          return (
+            <Pressable
+              key={c}
+              onPress={() => {
+                if (isLocked) {
+                  onLockedTap?.(c);
+                  return;
+                }
+                onChange(c);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isLocked
+                  ? `${c === "none" ? "transparent" : c} (locked)`
+                  : c === "none"
+                    ? "transparent"
+                    : c
+              }
+              accessibilityState={{ selected: isActive, disabled: isLocked }}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                backgroundColor: c === "none" ? "transparent" : c,
+                borderWidth: isActive ? 2 : 1,
+                borderColor: isActive ? theme.accent : theme.border,
+                opacity: isLocked ? 0.35 : 1,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {c === "none" ? <View style={styles.noneSlash} /> : null}
+              {isLocked ? <LockOverlay color={theme.text} small /> : null}
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
-  </View>
-);
+  );
+};
+
+const LockOverlay = ({
+  color,
+  small,
+}: {
+  color: string;
+  small?: boolean;
+}): React.ReactElement => {
+  const size = small ? 12 : 18;
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0,0,0,0.18)",
+      }}
+    >
+      <SvgXml xml={padlockSvg(color)} width={size} height={size} />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   noneSlash: {
