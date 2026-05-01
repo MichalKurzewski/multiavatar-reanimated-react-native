@@ -266,6 +266,7 @@ export const HAIR_PALETTE: readonly string[] = [
   "#ff0000",
   "#4caf50",
   "#9c27b0",
+  "#ffffff",
 ];
 
 // Mix of bright and neutral single backgrounds (the env circle).
