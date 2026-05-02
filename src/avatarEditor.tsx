@@ -1,5 +1,14 @@
 import * as React from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { SvgXml } from "react-native-svg";
 
 import {
@@ -58,6 +67,16 @@ export type AvatarEditorLockedTapInfo =
   | { part: "background"; value: string }
   | { part: "topColor"; value: string };
 
+export type AvatarEditorLabels = {
+  cancel?: string;
+  save?: string;
+  close?: string;
+  /** Used as accessibilityHint on shape/color buttons. */
+  selectHint?: string;
+  /** Used as accessibilityHint on locked entries. */
+  lockedHint?: string;
+};
+
 export type AvatarEditorProps = {
   /** Called when the user clicks Close/Cancel/Save and the editor wants to dismiss. */
   onClose?: () => void;
@@ -65,8 +84,17 @@ export type AvatarEditorProps = {
   theme?: AvatarEditorTheme;
   /** Called every time the user changes a value. Useful for live previews outside the editor. */
   onDraftChange?: (draft: CustomAvatar) => void;
-  /** Override the maximum width. Defaults to 340. */
+  /**
+   * Override the maximum width. By default the editor adapts to orientation
+   * (≈360 portrait, ≈680 landscape) and caps to the available viewport width.
+   */
   maxWidth?: number;
+  /**
+   * Override the maximum height. By default the editor caps to the available
+   * viewport height (minus a small safety margin) so the body becomes
+   * scrollable when content exceeds the viewport.
+   */
+  maxHeight?: number;
   /** Optional: which shapes/backgrounds are locked. All enabled by default. */
   locked?: AvatarEditorLocked;
   /** Optional: fired when the user taps a locked entry (instead of selecting it). */
@@ -88,6 +116,8 @@ export type AvatarEditorProps = {
   onNameSave?: (name: string) => void;
   /** Optional: fired whenever Save is clicked, regardless of which field changed. */
   onSave?: () => void;
+  /** Optional: override the default English button labels and accessibility hints. */
+  labels?: AvatarEditorLabels;
 };
 
 const DEFAULT_THEME: Required<AvatarEditorTheme> = {
@@ -107,6 +137,17 @@ const EMPTY_LOCKED: Required<AvatarEditorLocked> = {
   backgrounds: [],
   topColors: [],
 };
+
+const DEFAULT_LABELS: Required<AvatarEditorLabels> = {
+  cancel: "Cancel",
+  save: "Save",
+  close: "Close",
+  selectHint: "Double tap to select",
+  lockedHint: "Locked. Double tap for unlock requirements.",
+};
+
+/** Padding kept between the editor card and the screen edges. */
+const SCREEN_PADDING = 32;
 
 const padlockSvg = (color: string): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="9" x="5" y="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`;
@@ -140,6 +181,11 @@ function labelFor(part: EditablePart, role: ColorRole): string {
   return ROLE_LABEL[role];
 }
 
+function colorAccessibilityName(c: string): string {
+  if (c === "none") return "transparent";
+  return c;
+}
+
 /**
  * Self-contained avatar editor. Embed inside your own modal/sheet wrapper —
  * the editor doesn't render its own backdrop. Reads and writes the avatar via
@@ -149,7 +195,8 @@ export const AvatarEditor = ({
   onClose,
   theme,
   onDraftChange,
-  maxWidth = 340,
+  maxWidth,
+  maxHeight,
   locked,
   onLockedTap,
   name,
@@ -157,9 +204,19 @@ export const AvatarEditor = ({
   nameMaxLength = 30,
   onNameSave,
   onSave,
+  labels,
 }: AvatarEditorProps): React.ReactElement => {
   const t = { ...DEFAULT_THEME, ...theme };
+  const l = { ...DEFAULT_LABELS, ...labels };
   const lockedSets = { ...EMPTY_LOCKED, ...(locked ?? {}) };
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const isLandscape = screenWidth > screenHeight;
+  const defaultMaxWidth = isLandscape ? 680 : 360;
+  const cardWidth = Math.min(maxWidth ?? defaultMaxWidth, screenWidth - SCREEN_PADDING);
+  const cardMaxHeight = Math.min(
+    maxHeight ?? Number.POSITIVE_INFINITY,
+    screenHeight - SCREEN_PADDING
+  );
   const { avatar: stored, setAvatar } = useAvatar();
   const [draft, setDraft] = React.useState<CustomAvatar>(stored);
   const [activeTab, setActiveTab] = React.useState<TabId>("top");
@@ -211,50 +268,76 @@ export const AvatarEditor = ({
 
   return (
     <View
+      accessibilityViewIsModal={true}
       style={{
         backgroundColor: t.background,
         borderColor: t.border,
         borderWidth: 1,
         borderRadius: 12,
-        padding: 16,
-        width: maxWidth,
-        gap: 12,
+        width: cardWidth,
+        maxHeight: cardMaxHeight,
+        overflow: "hidden",
       }}
     >
-      {nameEnabled ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <View style={{ flex: 1, gap: 4 }}>
-            <Text style={{ color: t.text, fontSize: 12, opacity: 0.7 }}>
-              {nameLabel ?? "Name"}
-            </Text>
-            <TextInput
-              value={draftName}
-              onChangeText={setDraftName}
-              maxLength={nameMaxLength}
-              placeholder={nameLabel ?? "Name"}
-              placeholderTextColor={t.text + "80"}
-              accessibilityLabel={nameLabel ?? "Name"}
-              style={{
-                borderWidth: 1,
-                borderColor: t.border,
-                borderRadius: 6,
-                paddingHorizontal: 10,
-                color: t.text,
-                fontSize: 14,
-                ...(Platform.OS === "ios"
-                  ? { paddingVertical: 10 }
-                  : { paddingVertical: 6, textAlignVertical: "center", includeFontPadding: false }),
-              }}
-            />
-          </View>
+      <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 12 }}>
+        {nameEnabled ? (
           <View
             style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text
+                accessibilityRole="header"
+                style={{ color: t.text, fontSize: 12, opacity: 0.7 }}
+              >
+                {nameLabel ?? "Name"}
+              </Text>
+              <TextInput
+                value={draftName}
+                onChangeText={setDraftName}
+                maxLength={nameMaxLength}
+                placeholder={nameLabel ?? "Name"}
+                placeholderTextColor={`${t.text}80`}
+                accessibilityLabel={nameLabel ?? "Name"}
+                style={{
+                  borderWidth: 1,
+                  borderColor: t.border,
+                  borderRadius: 6,
+                  paddingHorizontal: 10,
+                  color: t.text,
+                  fontSize: 14,
+                  ...(Platform.OS === "ios"
+                    ? { paddingVertical: 10 }
+                    : { paddingVertical: 6, textAlignVertical: "center", includeFontPadding: false }),
+                }}
+              />
+            </View>
+            <View
+              accessible={true}
+              accessibilityRole="image"
+              accessibilityLabel="Avatar preview"
+              style={{
+                width: 120,
+                height: 120,
+                borderRadius: 60,
+                borderWidth: 1,
+                borderColor: t.border,
+                overflow: "hidden",
+              }}
+            >
+              <RiveAvatar avatar={draft} size={120} />
+            </View>
+          </View>
+        ) : (
+          <View
+            accessible={true}
+            accessibilityRole="image"
+            accessibilityLabel="Avatar preview"
+            style={{
+              alignSelf: "center",
               width: 120,
               height: 120,
               borderRadius: 60,
@@ -265,51 +348,42 @@ export const AvatarEditor = ({
           >
             <RiveAvatar avatar={draft} size={120} />
           </View>
-        </View>
-      ) : (
+        )}
+
         <View
+          accessibilityRole="tablist"
           style={{
-            alignSelf: "center",
-            width: 120,
-            height: 120,
-            borderRadius: 60,
-            borderWidth: 1,
-            borderColor: t.border,
-            overflow: "hidden",
+            flexDirection: "row",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderBottomColor: t.border,
           }}
         >
-          <RiveAvatar avatar={draft} size={120} />
+          {TABS.map(({ id, label }) => {
+            const isActive = id === activeTab;
+            return (
+              <Pressable
+                key={id}
+                onPress={() => setActiveTab(id)}
+                accessibilityRole="tab"
+                accessibilityLabel={label}
+                accessibilityHint={`Show ${label} options`}
+                accessibilityState={{ selected: isActive }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  alignItems: "center",
+                  borderBottomWidth: 2,
+                  borderBottomColor: isActive ? t.accent : "transparent",
+                }}
+              >
+                <Text style={{ color: t.text, fontSize: 12, fontWeight: isActive ? "600" : "400" }}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-      )}
-
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          borderBottomWidth: 1,
-          borderBottomColor: t.border,
-        }}
-      >
-        {TABS.map(({ id, label }) => {
-          const isActive = id === activeTab;
-          return (
-            <Pressable
-              key={id}
-              onPress={() => setActiveTab(id)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              style={{
-                flex: 1,
-                paddingVertical: 8,
-                alignItems: "center",
-                borderBottomWidth: 2,
-                borderBottomColor: isActive ? t.accent : "transparent",
-              }}
-            >
-              <Text style={{ color: t.text, fontSize: 12 }}>{label}</Text>
-            </Pressable>
-          );
-        })}
       </View>
 
       <View style={{ flexShrink: 1, minHeight: 0 }}>
@@ -320,6 +394,7 @@ export const AvatarEditor = ({
               value={draft.top}
               avatar={draft}
               theme={t}
+              labels={l}
               onChange={updatePart}
               lockedShapes={lockedSets.top}
               lockedTopColors={lockedSets.topColors}
@@ -331,6 +406,7 @@ export const AvatarEditor = ({
               value={draft[activeTab]}
               avatar={draft}
               theme={t}
+              labels={l}
               onChange={updatePart}
               lockedShapes={lockedSets[activeTab]}
               onLockedTap={onLockedTap}
@@ -342,6 +418,7 @@ export const AvatarEditor = ({
             value={draft.skin}
             palette={SKIN_PALETTE}
             theme={t}
+            labels={l}
             onChange={updateSkin}
           />
         ) : (
@@ -350,6 +427,7 @@ export const AvatarEditor = ({
             value={draft.background}
             palette={BACKGROUND_PALETTE}
             theme={t}
+            labels={l}
             onChange={updateBackground}
             lockedColors={lockedSets.backgrounds}
             onLockedTap={
@@ -366,9 +444,12 @@ export const AvatarEditor = ({
           flexDirection: "row",
           justifyContent: "flex-end",
           gap: 12,
-          paddingTop: 8,
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 16,
           borderTopWidth: 1,
           borderTopColor: t.border,
+          backgroundColor: t.background,
         }}
       >
         {hasChanges ? (
@@ -376,41 +457,44 @@ export const AvatarEditor = ({
             <Pressable
               onPress={handleCancel}
               accessibilityRole="button"
+              accessibilityLabel={l.cancel}
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingHorizontal: 18,
+                paddingVertical: 10,
                 borderRadius: 6,
                 borderWidth: 1,
                 borderColor: t.border,
               }}
             >
-              <Text style={{ color: t.text }}>Cancel</Text>
+              <Text style={{ color: t.text }}>{l.cancel}</Text>
             </Pressable>
             <Pressable
               onPress={handleSave}
               accessibilityRole="button"
+              accessibilityLabel={l.save}
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 8,
+                paddingHorizontal: 18,
+                paddingVertical: 10,
                 borderRadius: 6,
                 backgroundColor: t.buttonBackground,
               }}
             >
-              <Text style={{ color: t.buttonText }}>Save</Text>
+              <Text style={{ color: t.buttonText }}>{l.save}</Text>
             </Pressable>
           </>
         ) : (
           <Pressable
             onPress={handleClose}
             accessibilityRole="button"
+            accessibilityLabel={l.close}
             style={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
+              paddingHorizontal: 18,
+              paddingVertical: 10,
               borderRadius: 6,
               backgroundColor: t.buttonBackground,
             }}
           >
-            <Text style={{ color: t.buttonText }}>Close</Text>
+            <Text style={{ color: t.buttonText }}>{l.close}</Text>
           </Pressable>
         )}
       </View>
@@ -447,6 +531,7 @@ type PartTabProps<P extends EditablePart> = {
   value: { shape: ShapeForPart<P>; colors: string[] };
   avatar: CustomAvatar;
   theme: Required<AvatarEditorTheme>;
+  labels: Required<AvatarEditorLabels>;
   onChange: (part: P, next: { shape: ShapeForPart<P>; colors: string[] }) => void;
   lockedShapes?: ReadonlyArray<ShapeForPart<P>>;
   /** Locked colors for the top "main" palette. Only meaningful when part==="top". */
@@ -459,11 +544,13 @@ const PartTab = <P extends EditablePart>({
   value,
   avatar,
   theme,
+  labels,
   onChange,
   lockedShapes,
   lockedTopColors,
   onLockedTap,
 }: PartTabProps<P>): React.ReactElement => {
+  const partLabel = PART_LABELS[part];
   const pickShape = (shape: ShapeForPart<P>) => {
     onChange(part, { shape, colors: [...getDefaultPartColors(shape, part)] });
   };
@@ -509,13 +596,16 @@ const PartTab = <P extends EditablePart>({
   return (
     <ScrollView
       style={{ flexShrink: 1 }}
-      contentContainerStyle={{ paddingBottom: 4 }}
-      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+      showsVerticalScrollIndicator={true}
+      accessibilityLabel={`${partLabel} options`}
     >
       <View
-        style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6 }}
+        accessibilityRole="radiogroup"
+        accessibilityLabel={`${partLabel} styles`}
+        style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 8 }}
       >
-        {orderedShapes.map((shape) => {
+        {orderedShapes.map((shape, idx) => {
           const isActive = shape === value.shape;
           const isLocked = lockedSet.has(shape as unknown as string) && !isActive;
           const xml = renderShapeThumbnailSvg(
@@ -524,12 +614,14 @@ const PartTab = <P extends EditablePart>({
             shape,
             isActive ? value.colors : getDefaultPartColors(shape, part)
           );
+          const a11yLabel = `${partLabel} style ${idx + 1} of ${orderedShapes.length}`;
           return (
             <Pressable
               key={shape}
               onPress={() => handleShapePress(shape)}
-              accessibilityRole="button"
-              accessibilityLabel={isLocked ? `${shape} (locked)` : shape}
+              accessibilityRole="radio"
+              accessibilityLabel={a11yLabel}
+              accessibilityHint={isLocked ? labels.lockedHint : labels.selectHint}
               accessibilityState={{ selected: isActive, disabled: isLocked }}
               style={{
                 width: 48,
@@ -550,7 +642,7 @@ const PartTab = <P extends EditablePart>({
         })}
       </View>
 
-      <View style={{ marginTop: 12, gap: 12 }}>
+      <View style={{ marginTop: 16, gap: 12 }}>
         {colorRoleEntries(value, part).map(({ key, color, indices, label, palette, role }) => {
           const isTopMainRow = part === "top" && role === "main";
           const lockedForRow = isTopMainRow ? lockedTopColors : undefined;
@@ -562,9 +654,11 @@ const PartTab = <P extends EditablePart>({
             <ColorSlotRow
               key={key}
               label={label}
+              groupLabel={`${partLabel} ${label.toLowerCase()} color`}
               value={color}
               palette={palette}
               theme={theme}
+              labels={labels}
               onChange={(c) => setColorForIndices(indices, c)}
               lockedColors={lockedForRow}
               onLockedTap={lockedTapForRow}
@@ -581,6 +675,7 @@ type ColorOnlyTabProps = {
   value: string;
   palette: readonly string[];
   theme: Required<AvatarEditorTheme>;
+  labels: Required<AvatarEditorLabels>;
   onChange: (color: string) => void;
   lockedColors?: ReadonlyArray<string>;
   onLockedTap?: (color: string) => void;
@@ -591,21 +686,25 @@ const ColorOnlyTab = ({
   value,
   palette,
   theme,
+  labels,
   onChange,
   lockedColors,
   onLockedTap,
 }: ColorOnlyTabProps): React.ReactElement => (
   <ScrollView
     style={{ flexShrink: 1 }}
-    contentContainerStyle={{ paddingBottom: 4 }}
-    showsVerticalScrollIndicator={false}
+    contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
+    showsVerticalScrollIndicator={true}
+    accessibilityLabel={`${label} options`}
   >
-    <View style={{ marginTop: 8 }}>
+    <View style={{ marginTop: 4 }}>
       <ColorSlotRow
         label={label}
+        groupLabel={`${label} color`}
         value={value}
         palette={palette}
         theme={theme}
+        labels={labels}
         onChange={onChange}
         lockedColors={lockedColors}
         onLockedTap={onLockedTap}
@@ -616,9 +715,11 @@ const ColorOnlyTab = ({
 
 type ColorSlotRowProps = {
   label: string;
+  groupLabel: string;
   value: string;
   palette: readonly string[];
   theme: Required<AvatarEditorTheme>;
+  labels: Required<AvatarEditorLabels>;
   onChange: (color: string) => void;
   lockedColors?: ReadonlyArray<string>;
   onLockedTap?: (color: string) => void;
@@ -626,9 +727,11 @@ type ColorSlotRowProps = {
 
 const ColorSlotRow = ({
   label,
+  groupLabel,
   value,
   palette,
   theme,
+  labels,
   onChange,
   lockedColors,
   onLockedTap,
@@ -646,12 +749,16 @@ const ColorSlotRow = ({
   }, [palette, lockedSet, value]);
 
   return (
-    <View style={{ gap: 4 }}>
-      <Text style={{ fontSize: 12, color: theme.text }}>{label}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-        {orderedPalette.map((c) => {
+    <View style={{ gap: 6 }} accessibilityRole="radiogroup" accessibilityLabel={groupLabel}>
+      <Text accessibilityRole="header" style={{ fontSize: 12, color: theme.text }}>
+        {label}
+      </Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+        {orderedPalette.map((c, idx) => {
           const isActive = c === value;
           const isLocked = lockedSet.has(c) && !isActive;
+          const colorName = colorAccessibilityName(c);
+          const a11yLabel = `${label} color ${idx + 1} of ${orderedPalette.length}, ${colorName}`;
           return (
             <Pressable
               key={c}
@@ -662,19 +769,15 @@ const ColorSlotRow = ({
                 }
                 onChange(c);
               }}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isLocked
-                  ? `${c === "none" ? "transparent" : c} (locked)`
-                  : c === "none"
-                    ? "transparent"
-                    : c
-              }
+              accessibilityRole="radio"
+              accessibilityLabel={a11yLabel}
+              accessibilityHint={isLocked ? labels.lockedHint : labels.selectHint}
               accessibilityState={{ selected: isActive, disabled: isLocked }}
+              hitSlop={4}
               style={{
-                width: 24,
-                height: 24,
-                borderRadius: 12,
+                width: 28,
+                height: 28,
+                borderRadius: 14,
                 backgroundColor: c === "none" ? "transparent" : c,
                 borderWidth: isActive ? 2 : 1,
                 borderColor: isActive ? theme.accent : theme.border,
@@ -725,7 +828,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    top: 10,
+    top: 12,
     height: 2,
     backgroundColor: "#d33",
     transform: [{ rotate: "45deg" }],
