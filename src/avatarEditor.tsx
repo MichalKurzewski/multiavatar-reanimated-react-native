@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SvgXml } from "react-native-svg";
 
 import {
@@ -71,6 +71,23 @@ export type AvatarEditorProps = {
   locked?: AvatarEditorLocked;
   /** Optional: fired when the user taps a locked entry (instead of selecting it). */
   onLockedTap?: (info: AvatarEditorLockedTapInfo) => void;
+  /**
+   * Optional: current player name. When provided, an editable name field is
+   * rendered to the left of the avatar preview and the field participates in
+   * the editor's hasChanges / Save / Cancel flow.
+   */
+  name?: string;
+  /** Optional: placeholder + accessibility label for the name field. Defaults to "Name". */
+  nameLabel?: string;
+  /** Optional: max characters for the name input. Defaults to 30. */
+  nameMaxLength?: number;
+  /**
+   * Optional: fired on Save when the trimmed name draft differs from the
+   * `name` prop. Receives the trimmed new name. Only fired if `name` is set.
+   */
+  onNameSave?: (name: string) => void;
+  /** Optional: fired whenever Save is clicked, regardless of which field changed. */
+  onSave?: () => void;
 };
 
 const DEFAULT_THEME: Required<AvatarEditorTheme> = {
@@ -135,6 +152,11 @@ export const AvatarEditor = ({
   maxWidth = 340,
   locked,
   onLockedTap,
+  name,
+  nameLabel,
+  nameMaxLength = 30,
+  onNameSave,
+  onSave,
 }: AvatarEditorProps): React.ReactElement => {
   const t = { ...DEFAULT_THEME, ...theme };
   const lockedSets = { ...EMPTY_LOCKED, ...(locked ?? {}) };
@@ -143,6 +165,11 @@ export const AvatarEditor = ({
   const [activeTab, setActiveTab] = React.useState<TabId>("top");
   const storedRef = React.useRef(stored);
   storedRef.current = stored;
+  const nameEnabled = name !== undefined;
+  const [draftName, setDraftName] = React.useState<string>(name ?? "");
+  React.useEffect(() => {
+    if (nameEnabled) setDraftName(name ?? "");
+  }, [name, nameEnabled]);
 
   React.useEffect(() => {
     onDraftChange?.(draft);
@@ -161,13 +188,25 @@ export const AvatarEditor = ({
     setDraft((prev) => ({ ...prev, skin: color }));
   }, []);
 
-  const hasChanges = React.useMemo(
-    () => JSON.stringify(draft) !== JSON.stringify(stored),
-    [draft, stored]
-  );
+  const trimmedDraftName = draftName.trim();
+  const nameChanged = nameEnabled && trimmedDraftName.length > 0 && trimmedDraftName !== (name ?? "");
 
-  const handleSave = () => setAvatar(draft);
-  const handleCancel = () => setDraft(stored);
+  const hasChanges = React.useMemo(() => {
+    if (JSON.stringify(draft) !== JSON.stringify(stored)) return true;
+    return nameChanged;
+  }, [draft, stored, nameChanged]);
+
+  const handleSave = () => {
+    setAvatar(draft);
+    if (nameEnabled && nameChanged) {
+      onNameSave?.(trimmedDraftName);
+    }
+    onSave?.();
+  };
+  const handleCancel = () => {
+    setDraft(stored);
+    if (nameEnabled) setDraftName(name ?? "");
+  };
   const handleClose = () => onClose?.();
 
   return (
@@ -182,19 +221,66 @@ export const AvatarEditor = ({
         gap: 12,
       }}
     >
-      <View
-        style={{
-          alignSelf: "center",
-          width: 120,
-          height: 120,
-          borderRadius: 60,
-          borderWidth: 1,
-          borderColor: t.border,
-          overflow: "hidden",
-        }}
-      >
-        <RiveAvatar avatar={draft} size={120} />
-      </View>
+      {nameEnabled ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <View style={{ flex: 1, gap: 4 }}>
+            <Text style={{ color: t.text, fontSize: 12, opacity: 0.7 }}>
+              {nameLabel ?? "Name"}
+            </Text>
+            <TextInput
+              value={draftName}
+              onChangeText={setDraftName}
+              maxLength={nameMaxLength}
+              placeholder={nameLabel ?? "Name"}
+              placeholderTextColor={t.text + "80"}
+              accessibilityLabel={nameLabel ?? "Name"}
+              style={{
+                borderWidth: 1,
+                borderColor: t.border,
+                borderRadius: 6,
+                paddingHorizontal: 10,
+                color: t.text,
+                fontSize: 14,
+                ...(Platform.OS === "ios"
+                  ? { paddingVertical: 10 }
+                  : { paddingVertical: 6, textAlignVertical: "center", includeFontPadding: false }),
+              }}
+            />
+          </View>
+          <View
+            style={{
+              width: 120,
+              height: 120,
+              borderRadius: 60,
+              borderWidth: 1,
+              borderColor: t.border,
+              overflow: "hidden",
+            }}
+          >
+            <RiveAvatar avatar={draft} size={120} />
+          </View>
+        </View>
+      ) : (
+        <View
+          style={{
+            alignSelf: "center",
+            width: 120,
+            height: 120,
+            borderRadius: 60,
+            borderWidth: 1,
+            borderColor: t.border,
+            overflow: "hidden",
+          }}
+        >
+          <RiveAvatar avatar={draft} size={120} />
+        </View>
+      )}
 
       <View
         style={{
