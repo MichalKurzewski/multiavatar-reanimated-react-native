@@ -75,6 +75,28 @@ export type AvatarEditorLabels = {
   selectHint?: string;
   /** Used as accessibilityHint on locked entries. */
   lockedHint?: string;
+  /** Tab label for the hair/top section. Defaults to "Top". */
+  top?: string;
+  /** Tab label for the clothes section. Defaults to "Clothes". */
+  clothes?: string;
+  /** Tab label for the eyes section. Defaults to "Eyes". */
+  eyes?: string;
+  /** Tab label for the mouth section. Defaults to "Mouth". */
+  mouth?: string;
+  /** Tab label for the skin section. Defaults to "Skin". */
+  skin?: string;
+  /** Tab label for the background section. Defaults to "BG". */
+  background?: string;
+  /** Color row label for the primary color slot. Defaults to "Main". */
+  main?: string;
+  /** Color row label for the secondary color slot. Defaults to "Accent". */
+  accent?: string;
+  /** Mouth-specific override for the primary color slot. Defaults to "Lips". */
+  lips?: string;
+  /** Mouth-specific override for the secondary color slot. Defaults to "Facial hair". */
+  facialHair?: string;
+  /** Accessibility label for the avatar preview circle. Defaults to "Avatar preview". */
+  avatarPreview?: string;
 };
 
 export type AvatarEditorProps = {
@@ -144,6 +166,17 @@ const DEFAULT_LABELS: Required<AvatarEditorLabels> = {
   close: "Close",
   selectHint: "Double tap to select",
   lockedHint: "Locked. Double tap for unlock requirements.",
+  top: PART_LABELS.top,
+  clothes: PART_LABELS.clo,
+  eyes: PART_LABELS.eyes,
+  mouth: PART_LABELS.mouth,
+  skin: "Skin",
+  background: "BG",
+  main: "Main",
+  accent: "Accent",
+  lips: "Lips",
+  facialHair: "Facial hair",
+  avatarPreview: "Avatar preview",
 };
 
 /** Padding kept between the editor card and the screen edges. */
@@ -156,29 +189,39 @@ type ShapeTabId = EditablePart;
 type ColorTabId = "skin" | "background";
 type TabId = ShapeTabId | ColorTabId;
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "top", label: PART_LABELS.top },
-  { id: "clo", label: PART_LABELS.clo },
-  { id: "eyes", label: PART_LABELS.eyes },
-  { id: "mouth", label: PART_LABELS.mouth },
-  { id: "skin", label: "Skin" },
-  { id: "background", label: "BG" },
-];
-
 const isShapeTab = (id: TabId): id is ShapeTabId =>
   id === "top" || id === "clo" || id === "eyes" || id === "mouth";
 
-const ROLE_LABEL: Record<ColorRole, string> = { main: "Main", accent: "Accent" };
-const MOUTH_LABEL: Record<ColorRole, string> = { main: "Lips", accent: "Facial hair" };
+const buildTabs = (l: Required<AvatarEditorLabels>): { id: TabId; label: string }[] => [
+  { id: "top", label: l.top },
+  { id: "clo", label: l.clothes },
+  { id: "eyes", label: l.eyes },
+  { id: "mouth", label: l.mouth },
+  { id: "skin", label: l.skin },
+  { id: "background", label: l.background },
+];
+
+const partTabLabel = (part: EditablePart, l: Required<AvatarEditorLabels>): string => {
+  switch (part) {
+    case "top":
+      return l.top;
+    case "clo":
+      return l.clothes;
+    case "eyes":
+      return l.eyes;
+    case "mouth":
+      return l.mouth;
+  }
+};
 
 function paletteFor(part: EditablePart, role: ColorRole): readonly string[] {
   if (part === "top" && role === "main") return HAIR_PALETTE;
   return COLOR_PALETTE;
 }
 
-function labelFor(part: EditablePart, role: ColorRole): string {
-  if (part === "mouth") return MOUTH_LABEL[role];
-  return ROLE_LABEL[role];
+function labelFor(part: EditablePart, role: ColorRole, l: Required<AvatarEditorLabels>): string {
+  if (part === "mouth") return role === "main" ? l.lips : l.facialHair;
+  return role === "main" ? l.main : l.accent;
 }
 
 function colorAccessibilityName(c: string): string {
@@ -318,7 +361,7 @@ export const AvatarEditor = ({
             <View
               accessible={true}
               accessibilityRole="image"
-              accessibilityLabel="Avatar preview"
+              accessibilityLabel={l.avatarPreview}
               style={{
                 width: 120,
                 height: 120,
@@ -335,7 +378,7 @@ export const AvatarEditor = ({
           <View
             accessible={true}
             accessibilityRole="image"
-            accessibilityLabel="Avatar preview"
+            accessibilityLabel={l.avatarPreview}
             style={{
               alignSelf: "center",
               width: 120,
@@ -359,7 +402,7 @@ export const AvatarEditor = ({
             borderBottomColor: t.border,
           }}
         >
-          {TABS.map(({ id, label }) => {
+          {buildTabs(l).map(({ id, label }) => {
             const isActive = id === activeTab;
             return (
               <Pressable
@@ -414,7 +457,7 @@ export const AvatarEditor = ({
           )
         ) : activeTab === "skin" ? (
           <ColorOnlyTab
-            label="Skin"
+            label={l.skin}
             value={draft.skin}
             palette={SKIN_PALETTE}
             theme={t}
@@ -423,7 +466,7 @@ export const AvatarEditor = ({
           />
         ) : (
           <ColorOnlyTab
-            label="Background"
+            label={l.background}
             value={draft.background}
             palette={BACKGROUND_PALETTE}
             theme={t}
@@ -504,7 +547,8 @@ export const AvatarEditor = ({
 
 function colorRoleEntries<P extends EditablePart>(
   part: { shape: ShapeForPart<P>; colors: readonly string[] },
-  partType: P
+  partType: P,
+  labels: Required<AvatarEditorLabels>
 ): {
   key: string;
   role: ColorRole;
@@ -521,7 +565,7 @@ function colorRoleEntries<P extends EditablePart>(
     role: group.role,
     indices: group.indices,
     color: part.colors[group.indices[0]] ?? "#000",
-    label: labelFor(partType, group.role),
+    label: labelFor(partType, group.role, labels),
     palette: paletteFor(partType, group.role),
   }));
 }
@@ -550,7 +594,7 @@ const PartTab = <P extends EditablePart>({
   lockedTopColors,
   onLockedTap,
 }: PartTabProps<P>): React.ReactElement => {
-  const partLabel = PART_LABELS[part];
+  const partLabel = partTabLabel(part, labels);
   const pickShape = (shape: ShapeForPart<P>) => {
     onChange(part, { shape, colors: [...getDefaultPartColors(shape, part)] });
   };
@@ -643,7 +687,7 @@ const PartTab = <P extends EditablePart>({
       </View>
 
       <View style={{ marginTop: 16, gap: 12 }}>
-        {colorRoleEntries(value, part).map(({ key, color, indices, label, palette, role }) => {
+        {colorRoleEntries(value, part, labels).map(({ key, color, indices, label, palette, role }) => {
           const isTopMainRow = part === "top" && role === "main";
           const lockedForRow = isTopMainRow ? lockedTopColors : undefined;
           const lockedTapForRow =
